@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aim Trainer Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a; /* Tailwind slate-900 */
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+        h1, h2, h3, .gamer-font {
+            font-family: 'Rajdhani', sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: none; /* Hide default cursor */
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+        }
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+        .hidden { display: none !important; }
+        
+        /* Custom range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #6366f1; /* Indigo 500 */
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.8);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Heads Up Display (HUD) -->
+    <div id="hud" class="hud hidden text-2xl gamer-font font-bold tracking-wider text-indigo-300 drop-shadow-md">
+        <div>Time: <span id="timeDisplay" class="text-white">60.0</span>s</div>
+        <div>Hits: <span id="scoreDisplay" class="text-white">0</span></div>
+    </div>
+
+    <!-- Main Menu Overlay -->
+    <div id="menuOverlay" class="overlay">
+        <div class="bg-slate-800 border border-slate-600 p-8 rounded-2xl shadow-[0_0_40px_rgba(99,102,241,0.2)] max-w-md w-full relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+            <h1 class="text-4xl text-center mb-6 gamer-font font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">AIM TRAINER PRO</h1>
+            
+            <div class="space-y-4 text-sm font-semibold text-slate-300">
+                <!-- Sensitivity -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label>Sensitivity</label>
+                        <span id="sensValue" class="text-indigo-400">1.0</span>
+                    </div>
+                    <input type="range" id="sensInput" min="0.1" max="5.0" step="0.1" value="1.0">
+                </div>
+
+                <!-- Target Size -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label>Target Size (Radius)</label>
+                        <span id="sizeValue" class="text-indigo-400">30px</span>
+                    </div>
+                    <input type="range" id="sizeInput" min="10" max="80" step="1" value="30">
+                </div>
+
+                <!-- Max Targets -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label>Max Concurrent Targets</label>
+                        <span id="maxTargetsValue" class="text-indigo-400">3</span>
+                    </div>
+                    <input type="range" id="maxTargetsInput" min="1" max="10" step="1" value="3">
+                </div>
+
+                <!-- Spawn Interval -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label>Spawn Interval (ms)</label>
+                        <span id="spawnIntervalValue" class="text-indigo-400">600ms</span>
+                    </div>
+                    <input type="range" id="spawnIntervalInput" min="200" max="2000" step="50" value="600">
+                </div>
+
+                <!-- Session Duration & Crosshair config -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block mb-1">Duration</label>
+                        <select id="durationInput" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-white outline-none focus:border-indigo-500 transition-colors">
+                            <option value="15">15 Seconds</option>
+                            <option value="30">30 Seconds</option>
+                            <option value="60" selected>60 Seconds</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block mb-1">Crosshair Style</label>
+                        <select id="crosshairInput" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-white outline-none focus:border-indigo-500 transition-colors">
+                            <option value="cross">Cross</option>
+                            <option value="dot">Dot</option>
+                            <option value="circle">Circle</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <label>Crosshair Color:</label>
+                    <input type="color" id="colorInput" value="#00ffcc" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0">
+                </div>
+            </div>
+
+            <button id="startBtn" class="w-full mt-8 bg-indigo-600 hover:bg-indigo-500 text-white gamer-font font-bold text-xl py-3 rounded transition-all shadow-[0_0_15px_rgba(79,70,229,0.5)] hover:shadow-[0_0_25px_rgba(99,102,241,0.8)]">
+                START TRAINING
+            </button>
+            <p class="text-center text-xs text-slate-500 mt-4">Press ESC during gameplay to end early.</p>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameOverOverlay" class="overlay hidden">
+        <div class="bg-slate-800 border border-slate-600 p-8 rounded-2xl shadow-[0_0_40px_rgba(236,72,153,0.2)] w-[90%] max-w-4xl max-h-[90vh] overflow-y-auto relative custom-scrollbar">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-500 to-rose-500"></div>
+            <h2 class="text-4xl text-center mb-6 gamer-font font-bold text-rose-400">SESSION COMPLETE</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-center">
+                <div class="bg-slate-700/50 p-4 rounded-xl border border-slate-600">
+                    <div class="text-slate-400 text-sm uppercase tracking-wider mb-1">Total Hits</div>
+                    <div id="statHits" class="text-3xl gamer-font font-bold text-white">0</div>
+                </div>
+                <div class="bg-slate-700/50 p-4 rounded-xl border border-slate-600">
+                    <div class="text-slate-400 text-sm uppercase tracking-wider mb-1">Avg Reaction</div>
+                    <div id="statReaction" class="text-3xl gamer-font font-bold text-indigo-400">0ms</div>
+                </div>
+                <div class="bg-slate-700/50 p-4 rounded-xl border border-slate-600">
+                    <div class="text-slate-400 text-sm uppercase tracking-wider mb-1">Avg Accuracy</div>
+                    <div id="statAccuracy" class="text-3xl gamer-font font-bold text-emerald-400">0%</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                    <canvas id="reactionChart"></canvas>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                    <canvas id="accuracyChart"></canvas>
+                </div>
+            </div>
+
+            <button id="menuBtn" class="block w-full max-w-xs mx-auto bg-slate-700 hover:bg-slate-600 text-white gamer-font font-bold text-xl py-3 rounded transition-all shadow-md">
+                BACK TO MENU
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Elements & Context ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const menuOverlay = document.getElementById('menuOverlay');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const hud = document.getElementById('hud');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const startBtn = document.getElementById('startBtn');
+        const menuBtn = document.getElementById('menuBtn');
+
+        // Inputs
+        const sensInput = document.getElementById('sensInput');
+        const sensValue = document.getElementById('sensValue');
+        const sizeInput = document.getElementById('sizeInput');
+        const sizeValue = document.getElementById('sizeValue');
+        const maxTargetsInput = document.getElementById('maxTargetsInput');
+        const maxTargetsValue = document.getElementById('maxTargetsValue');
+        const spawnIntervalInput = document.getElementById('spawnIntervalInput');
+        const spawnIntervalValue = document.getElementById('spawnIntervalValue');
+        const durationInput = document.getElementById('durationInput');
+        const crosshairInput = document.getElementById('crosshairInput');
+        const colorInput = document.getElementById('colorInput');
+
+        // Stats Elements
+        const statHits = document.getElementById('statHits');
+        const statReaction = document.getElementById('statReaction');
+        const statAccuracy = document.getElementById('statAccuracy');
+
+        // --- Game State & Configuration ---
+        let gameState = 'MENU'; // MENU, PLAYING, ENDED
+        let animationId;
+        let lastTime = 0;
+        let lastSpawnTime = 0;
+        let sessionTimer = 0;
+        let sessionDuration = 60; // default
+        
+        let config = {
+            sensitivity: 1.0,
+            targetRadius: 30,
+            maxTargets: 3,
+            spawnInterval: 600,
+            crosshairType: 'cross',
+            crosshairColor: '#00ffcc'
+        };
+
+        // Virtual Cursor
+        let cursor = { x: 0, y: 0 };
+        
+        // Entities
+        let targets = [];
+        let hitEffects = [];
+        
+        // Statistics
+        let sessionStats = {
+            hits: 0,
+            shots: 0,
+            reactionTimes: [], // array of ms
+            accuracies: []     // array of percentages
+        };
+
+        let charts = { reaction: null, accuracy: null };
+
+        // --- Initialization ---
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if(gameState === 'MENU') {
+                cursor.x = canvas.width / 2;
+                cursor.y = canvas.height / 2;
+                drawMenuBackground();
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Sync UI Sliders
+        const syncLabel = (input, label, suffix = '') => {
+            input.addEventListener('input', (e) => {
+                label.textContent = e.target.value + suffix;
+            });
+        };
+        syncLabel(sensInput, sensValue);
+        syncLabel(sizeInput, sizeValue, 'px');
+        syncLabel(maxTargetsInput, maxTargetsValue);
+        syncLabel(spawnIntervalInput, spawnIntervalValue, 'ms');
+
+        // --- Pointer Lock & Input Handling ---
+        startBtn.addEventListener('click', startGame);
+        menuBtn.addEventListener('click', showMenu);
+
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement !== canvas && gameState === 'PLAYING') {
+                // User pressed ESC or lost pointer lock
+                endGame();
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (gameState === 'PLAYING' && document.pointerLockElement === canvas) {
+                // Update virtual cursor based on movement and sensitivity
+                cursor.x += e.movementX * config.sensitivity;
+                cursor.y += e.movementY * config.sensitivity;
+                
+                // Clamp to screen bounds
+                cursor.x = Math.max(0, Math.min(canvas.width, cursor.x));
+                cursor.y = Math.max(0, Math.min(canvas.height, cursor.y));
+            }
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (gameState === 'PLAYING' && e.button === 0) {
+                shoot();
+            }
+        });
+
+        // --- Game Logic ---
+        function startGame() {
+            // Read config from UI
+            config.sensitivity = parseFloat(sensInput.value);
+            config.targetRadius = parseInt(sizeInput.value);
+            config.maxTargets = parseInt(maxTargetsInput.value);
+            config.spawnInterval = parseInt(spawnIntervalInput.value);
+            config.crosshairType = crosshairInput.value;
+            config.crosshairColor = colorInput.value;
+            sessionDuration = parseInt(durationInput.value);
+
+            // Reset State
+            sessionStats = { hits: 0, shots: 0, reactionTimes: [], accuracies: [] };
+            targets = [];
+            hitEffects = [];
+            sessionTimer = sessionDuration;
+            scoreDisplay.textContent = '0';
+            timeDisplay.textContent = sessionTimer.toFixed(1);
+            
+            // Center cursor initially
+            cursor.x = canvas.width / 2;
+            cursor.y = canvas.height / 2;
+
+            gameState = 'PLAYING';
+            menuOverlay.classList.add('hidden');
+            gameOverOverlay.classList.add('hidden');
+            hud.classList.remove('hidden');
+
+            canvas.requestPointerLock();
+            
+            lastTime = performance.now();
+            lastSpawnTime = performance.now();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameState = 'ENDED';
+            cancelAnimationFrame(animationId);
+            document.exitPointerLock();
+            
+            hud.classList.add('hidden');
+            gameOverOverlay.classList.remove('hidden');
+            
+            calculateAndShowStats();
+        }
+
+        function showMenu() {
+            gameState = 'MENU';
+            gameOverOverlay.classList.add('hidden');
+            menuOverlay.classList.remove('hidden');
+            resizeCanvas(); // Draw background
+        }
+
+        function spawnTarget(currentTime) {
+            if (targets.length >= config.maxTargets) return;
+
+            const padding = config.targetRadius + 10;
+            const x = padding + Math.random() * (canvas.width - padding * 2);
+            const y = padding + Math.random() * (canvas.height - padding * 2);
+            
+            targets.push({
+                x, y, 
+                radius: 0, // starts at 0 for spawn animation
+                targetRadius: config.targetRadius,
+                spawnTime: currentTime,
+                color: `hsl(${Math.random() * 60 + 330}, 80%, 60%)` // Pink/Red variations
+            });
+        }
+
+        function shoot() {
+            sessionStats.shots++;
+            const now = performance.now();
+            let hitIndex = -1;
+            let closestDist = Infinity;
+
+            // Find if we hit any target (and find the closest center if multiple overlap)
+            for (let i = 0; i < targets.length; i++) {
+                const t = targets[i];
+                const dist = Math.hypot(cursor.x - t.x, cursor.y - t.y);
+                
+                if (dist <= t.radius && dist < closestDist) {
+                    closestDist = dist;
+                    hitIndex = i;
+                }
+            }
+
+            if (hitIndex !== -1) {
+                const target = targets[hitIndex];
+                
+                // Calculate Stats
+                const reactionTime = now - target.spawnTime;
+                // Accuracy: 100% at center, 0% at edge
+                const accuracy = Math.max(0, (1 - (closestDist / target.targetRadius))) * 100;
+                
+                sessionStats.hits++;
+                sessionStats.reactionTimes.push(reactionTime);
+                sessionStats.accuracies.push(accuracy);
+                
+                scoreDisplay.textContent = sessionStats.hits;
+
+                // Visual effect
+                hitEffects.push({
+                    x: target.x,
+                    y: target.y,
+                    radius: target.radius,
+                    alpha: 1,
+                    color: config.crosshairColor
+                });
+
+                // Remove target
+                targets.splice(hitIndex, 1);
+            } else {
+                // Miss effect (small red dot)
+                 hitEffects.push({
+                    x: cursor.x,
+                    y: cursor.y,
+                    radius: 5,
+                    alpha: 1,
+                    color: '#ef4444'
+                });
+            }
+        }
+
+        // --- Render Loop ---
+        function gameLoop(timestamp) {
+            if (gameState !== 'PLAYING') return;
+
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // Timer logic
+            sessionTimer -= dt / 1000;
+            if (sessionTimer <= 0) {
+                endGame();
+                return;
+            }
+            timeDisplay.textContent = Math.max(0, sessionTimer).toFixed(1);
+
+            // Spawning logic
+            if (timestamp - lastSpawnTime > config.spawnInterval) {
+                spawnTarget(timestamp);
+                lastSpawnTime = timestamp;
+            }
+
+            // --- DRAWING ---
+            // Clear Background
+            ctx.fillStyle = '#0f172a'; // Match body bg
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw subtle grid (optional aesthetic)
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            const gridSize = 50;
+            for(let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for(let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Draw Hit Effects
+            for (let i = hitEffects.length - 1; i >= 0; i--) {
+                const eff = hitEffects[i];
+                eff.radius += dt * 0.1;
+                eff.alpha -= dt * 0.003;
+                
+                if (eff.alpha <= 0) {
+                    hitEffects.splice(i, 1);
+                    continue;
+                }
+
+                ctx.beginPath();
+                ctx.arc(eff.x, eff.y, eff.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(${hexToRgb(eff.color)}, ${eff.alpha})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Draw Targets
+            targets.forEach(t => {
+                // Animate spawn growth
+                if (t.radius < t.targetRadius) {
+                    t.radius += dt * 0.2;
+                    if (t.radius > t.targetRadius) t.radius = t.targetRadius;
+                }
+
+                // Outer circle
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+                ctx.fillStyle = t.color;
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                // Inner bullseye rings
+                if (t.radius > 10) {
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, t.radius * 0.6, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.fill();
+                }
+                if (t.radius > 20) {
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, t.radius * 0.2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                }
+            });
+
+            // Draw Crosshair
+            drawCrosshair();
+
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function drawCrosshair() {
+            ctx.save();
+            ctx.translate(cursor.x, cursor.y);
+            ctx.strokeStyle = config.crosshairColor;
+            ctx.fillStyle = config.crosshairColor;
+            ctx.lineWidth = 2;
+
+            if (config.crosshairType === 'cross') {
+                const len = 10;
+                const gap = 4;
+                ctx.beginPath();
+                ctx.moveTo(-len - gap, 0); ctx.lineTo(-gap, 0);
+                ctx.moveTo(len + gap, 0); ctx.lineTo(gap, 0);
+                ctx.moveTo(0, -len - gap); ctx.lineTo(0, -gap);
+                ctx.moveTo(0, len + gap); ctx.lineTo(0, gap);
+                ctx.stroke();
+                // center dot
+                ctx.beginPath(); ctx.arc(0, 0, 1.5, 0, Math.PI*2); ctx.fill();
+            } 
+            else if (config.crosshairType === 'dot') {
+                ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI*2); ctx.fill();
+            }
+            else if (config.crosshairType === 'circle') {
+                ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(0, 0, 1.5, 0, Math.PI*2); ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        function drawMenuBackground() {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Decorative background for menu
+            for(let i=0; i<20; i++) {
+                ctx.beginPath();
+                ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 50 + 10, 0, Math.PI*2);
+                ctx.fillStyle = `rgba(99, 102, 241, ${Math.random() * 0.1})`;
+                ctx.fill();
+            }
+        }
+
+        // --- Post-Game Stats & Charts ---
+        function calculateAndShowStats() {
+            const hits = sessionStats.hits;
+            statHits.textContent = hits;
+
+            let avgReact = 0;
+            let avgAcc = 0;
+
+            if (hits > 0) {
+                const sumReact = sessionStats.reactionTimes.reduce((a, b) => a + b, 0);
+                avgReact = (sumReact / hits).toFixed(0);
+                
+                const sumAcc = sessionStats.accuracies.reduce((a, b) => a + b, 0);
+                avgAcc = (sumAcc / hits).toFixed(1);
+            }
+
+            statReaction.textContent = avgReact + 'ms';
+            statAccuracy.textContent = avgAcc + '%';
+
+            renderCharts();
+        }
+
+        function renderCharts() {
+            // Destroy existing charts to prevent canvas reuse errors
+            if (charts.reaction) charts.reaction.destroy();
+            if (charts.accuracy) charts.accuracy.destroy();
+
+            const labels = sessionStats.reactionTimes.map((_, i) => `Hit ${i + 1}`);
+
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = 'Inter';
+
+            // Chart 1: Speed (Reaction Time)
+            const ctxReaction = document.getElementById('reactionChart').getContext('2d');
+            charts.reaction = new Chart(ctxReaction, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Reaction Time (ms)',
+                        data: sessionStats.reactionTimes,
+                        borderColor: '#818cf8', // indigo-400
+                        backgroundColor: 'rgba(129, 140, 248, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointBackgroundColor: '#818cf8',
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'SPEED TRACKER (LOWER IS BETTER)', color: '#cbd5e1', font: {family: 'Rajdhani', size: 16} }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#334155' } },
+                        x: { display: false }
+                    }
+                }
+            });
+
+            // Chart 2: Accuracy
+            const ctxAccuracy = document.getElementById('accuracyChart').getContext('2d');
+            charts.accuracy = new Chart(ctxAccuracy, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Accuracy (%)',
+                        data: sessionStats.accuracies,
+                        borderColor: '#34d399', // emerald-400
+                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointBackgroundColor: '#34d399',
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'ACCURACY TRACKER (HIGHER IS BETTER)', color: '#cbd5e1', font: {family: 'Rajdhani', size: 16} }
+                    },
+                    scales: {
+                        y: { min: 0, max: 100, grid: { color: '#334155' } },
+                        x: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Utility: Hex to RGB for hit effects
+        function hexToRgb(hex) {
+            let c;
+            if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+                c= hex.substring(1).split('');
+                if(c.length== 3){
+                    c= [c[0], c[0], c[1], c[1], c[2], c[2]];
+                }
+                c= '0x'+c.join('');
+                return [(c>>16)&255, (c>>8)&255, c&255].join(',');
+            }
+            return "255,255,255";
+        }
+
+    </script>
+</body>
+</html>
